@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+
+	"github.com/teasec4/ollama-go-cli/internal/constants"
 )
 
 // OllamaClient handles communication with Ollama API
@@ -76,7 +78,7 @@ func (o *OllamaClient) ChatStream(messages []ChatMessage) (<-chan string, <-chan
 		return nil, nil, err
 	}
 
-	httpReq, err := http.NewRequest("POST", o.baseURL+"/api/chat", bytes.NewBuffer(body))
+	httpReq, err := http.NewRequest("POST", o.baseURL+constants.OllamaAPIChat, bytes.NewBuffer(body))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -89,8 +91,11 @@ func (o *OllamaClient) ChatStream(messages []ChatMessage) (<-chan string, <-chan
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
 		resp.Body.Close()
+		if err != nil {
+			return nil, nil, fmt.Errorf("API error (%d): failed to read response body", resp.StatusCode)
+		}
 		return nil, nil, fmt.Errorf("API error (%d): %s", resp.StatusCode, string(body))
 	}
 
@@ -144,7 +149,7 @@ func (o *OllamaClient) Chat(messages []ChatMessage) (*ChatResponse, int, error) 
 		return nil, 0, err
 	}
 
-	httpReq, err := http.NewRequest("POST", o.baseURL+"/api/chat", bytes.NewBuffer(body))
+	httpReq, err := http.NewRequest("POST", o.baseURL+constants.OllamaAPIChat, bytes.NewBuffer(body))
 	if err != nil {
 		return nil, 0, err
 	}
@@ -158,7 +163,10 @@ func (o *OllamaClient) Chat(messages []ChatMessage) (*ChatResponse, int, error) 
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, 0, fmt.Errorf("API error (%d): failed to read response body", resp.StatusCode)
+		}
 		return nil, 0, fmt.Errorf("API error (%d): %s", resp.StatusCode, string(body))
 	}
 

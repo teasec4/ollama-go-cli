@@ -9,6 +9,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/teasec4/ollama-go-cli/internal/chat"
+	"github.com/teasec4/ollama-go-cli/internal/constants"
 )
 
 // TUIModel is the main TUI model
@@ -56,11 +57,20 @@ func (m *TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.thinking {
 			// Allow scrolling even while thinking
 			switch msg.String() {
-			case "pageup", "up":
-				m.scrollOffset += 3
+			case "pageup":
+				m.scrollOffset += constants.ScrollOffsetPageSize
 				return m, nil
-			case "pagedown", "down":
-				m.scrollOffset -= 3
+			case "pagedown":
+				m.scrollOffset -= constants.ScrollOffsetPageSize
+				if m.scrollOffset < 0 {
+					m.scrollOffset = 0
+				}
+				return m, nil
+			case "up":
+				m.scrollOffset += constants.ScrollOffsetLineSize
+				return m, nil
+			case "down":
+				m.scrollOffset -= constants.ScrollOffsetLineSize
 				if m.scrollOffset < 0 {
 					m.scrollOffset = 0
 				}
@@ -73,19 +83,19 @@ func (m *TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "ctrl+c":
 			return m, tea.Quit
 		case "pageup":
-			m.scrollOffset += 5
+			m.scrollOffset += constants.ScrollOffsetPageSize
 			return m, nil
 		case "pagedown":
-			m.scrollOffset -= 5
+			m.scrollOffset -= constants.ScrollOffsetPageSize
 			if m.scrollOffset < 0 {
 				m.scrollOffset = 0
 			}
 			return m, nil
 		case "up":
-			m.scrollOffset += 1
+			m.scrollOffset += constants.ScrollOffsetLineSize
 			return m, nil
 		case "down":
-			m.scrollOffset -= 1
+			m.scrollOffset -= constants.ScrollOffsetLineSize
 			if m.scrollOffset < 0 {
 				m.scrollOffset = 0
 			}
@@ -148,7 +158,7 @@ func (m *TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case msgThinkFrame:
 		if m.thinking {
-			m.thinkFrame = (m.thinkFrame + 1) % 10
+			m.thinkFrame = (m.thinkFrame + 1) % len(constants.AnimationFrames)
 			return m, m.animateThinker()
 		}
 
@@ -173,40 +183,40 @@ func (m *TUIModel) View() string {
 
 	// Styles
 	headerStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("205")).
+		Foreground(lipgloss.Color(constants.ColorMagenta)).
 		Bold(true).
 		Padding(0, 1)
 
-	msgWidth := m.width - 3
-	if msgWidth < 20 {
-		msgWidth = 20
+	msgWidth := m.width - constants.MessageWidthOffset
+	if msgWidth < constants.MinimumMessageWidth {
+		msgWidth = constants.MinimumMessageWidth
 	}
 
 	assistantStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("46")).
+		Foreground(lipgloss.Color(constants.ColorGreen)).
 		Bold(true).
 		PaddingLeft(1)
 
 	userStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("51")).
+		Foreground(lipgloss.Color(constants.ColorCyan)).
 		PaddingLeft(1)
 
 	assistantLabelStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("40")).
+		Foreground(lipgloss.Color(constants.ColorLimeGreen)).
 		Bold(true)
 
 	inputStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("51")).
+		Foreground(lipgloss.Color(constants.ColorCyan)).
 		Bold(true).
 		PaddingLeft(1)
 
 	statusStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("226")).
+		Foreground(lipgloss.Color(constants.ColorYellow)).
 		PaddingRight(1).
 		PaddingLeft(1)
 
 	helpStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("240")).
+		Foreground(lipgloss.Color(constants.ColorDarkGray)).
 		Italic(true)
 
 	// Header
@@ -223,7 +233,7 @@ func (m *TUIModel) View() string {
 	m.mu.Lock()
 	// Add session history
 	for _, msg := range m.session.Messages {
-		if msg.Role == "user" {
+		if msg.Role == constants.RoleUser {
 			text := fmt.Sprintf("You: %s", msg.Content)
 			wrappedText := wrapText(text, msgWidth)
 			for _, line := range strings.Split(wrappedText, "\n") {
@@ -256,7 +266,7 @@ func (m *TUIModel) View() string {
 
 	// Add current reply if streaming
 	if m.thinking && m.currentReply != "" {
-		frames := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
+		frames := constants.AnimationFrames
 		replyDisplay := m.currentReply + frames[m.thinkFrame]
 		wrappedReply := wrapText(replyDisplay, msgWidth)
 		replyLines := strings.Split(wrappedReply, "\n")
@@ -294,7 +304,7 @@ func (m *TUIModel) View() string {
 	inputPrompt := inputStyle.Render("You: ")
 	var inputArea string
 
-	inputMaxWidth := m.width - 6
+	inputMaxWidth := m.width - constants.InputMaxWidthOffset
 	runes := []rune(m.input)
 	var displayInput string
 
@@ -314,31 +324,20 @@ func (m *TUIModel) View() string {
 	// Thinking indicator
 	thinkingMsg := ""
 	if m.thinking && m.currentReply == "" {
-		frames := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
+		frames := constants.AnimationFrames
 		thinkingMsg = assistantLabelStyle.Render("Assistant: ") + assistantStyle.Render(fmt.Sprintf("%s thinking...", frames[m.thinkFrame])) + "\n"
 	}
 
 	// Error message
 	errorMsg := ""
 	if m.err != nil {
-		errorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
+		errorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(constants.ColorRed))
 		errorMsg = errorStyle.Render(fmt.Sprintf("Error: %v", m.err)) + "\n"
 		m.err = nil
 	}
 
 	// Memory bar
-	barLength := 10
-	filledLength := (m.memPercent * barLength) / 100
-	memBar := "["
-	for i := 0; i < barLength; i++ {
-		if i < filledLength {
-			memBar += "="
-		} else {
-			memBar += " "
-		}
-	}
-	memBar += "]"
-
+	memBar := buildMemoryBar(m.memPercent)
 	scrollInfo := ""
 	if m.scrollOffset > 0 {
 		scrollInfo = fmt.Sprintf(" | ↑ %d lines", m.scrollOffset)
@@ -348,7 +347,7 @@ func (m *TUIModel) View() string {
 	// Help text
 	helpContent := "PgUp/↑:scroll up  PgDn/↓:scroll down  Ctrl+C:quit"
 	helpText := helpStyle.Render(helpContent)
-	
+
 	// Right-align help text (use visible length for calculation)
 	helpLen := visibleLen(helpText)
 	helpPadding := m.width - helpLen
@@ -386,64 +385,9 @@ type msgError struct {
 	err error
 }
 
-// visibleLen returns visible length excluding ANSI codes
-func visibleLen(text string) int {
-	visible := text
-	for {
-		start := strings.Index(visible, "\x1b[")
-		if start == -1 {
-			break
-		}
-		end := strings.Index(visible[start:], "m")
-		if end == -1 {
-			break
-		}
-		visible = visible[:start] + visible[start+end+1:]
-	}
-	return len(visible)
-}
-
-// wrapText wraps text to fit within max width
-func wrapText(text string, maxWidth int) string {
-	if maxWidth < 1 {
-		return text
-	}
-
-	words := strings.Fields(text)
-	if len(words) == 0 {
-		return text
-	}
-
-	var lines []string
-	var currentLine string
-
-	for _, word := range words {
-		testLine := currentLine
-		if testLine != "" {
-			testLine += " "
-		}
-		testLine += word
-
-		if visibleLen(testLine) <= maxWidth {
-			currentLine = testLine
-		} else {
-			if currentLine != "" {
-				lines = append(lines, currentLine)
-			}
-			currentLine = word
-		}
-	}
-
-	if currentLine != "" {
-		lines = append(lines, currentLine)
-	}
-
-	return strings.Join(lines, "\n")
-}
-
 // animateThinker sends animation frames
 func (m *TUIModel) animateThinker() tea.Cmd {
-	return tea.Tick(200*time.Millisecond, func(t time.Time) tea.Msg {
+	return tea.Tick(time.Duration(constants.ThinkingInterval)*time.Millisecond, func(t time.Time) tea.Msg {
 		return msgThinkFrame{}
 	})
 }

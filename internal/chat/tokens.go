@@ -2,6 +2,8 @@ package chat
 
 import (
 	"strings"
+
+	"github.com/teasec4/ollama-go-cli/internal/constants"
 )
 
 // EstimateTokens estimates token count using simple heuristics
@@ -13,11 +15,11 @@ func EstimateTokens(text string) int {
 
 	// Method 1: Count by characters (1 token ≈ 4 chars)
 	charCount := len(text)
-	charTokens := (charCount + 3) / 4 // Round up
+	charTokens := (charCount + constants.CharactersPerToken - 1) / constants.CharactersPerToken // Round up
 
 	// Method 2: Count by words (1 token ≈ 0.75 words, so 1 word ≈ 1.3 tokens)
 	words := strings.Fields(text)
-	wordTokens := (len(words) * 4) / 3 // Roughly 1.3 tokens per word
+	wordTokens := (len(words) * constants.TokensPerWordFactor) / constants.TokensPerWordDivisor
 
 	// Average both methods
 	estimated := (charTokens + wordTokens) / 2

@@ -2,6 +2,7 @@ package chat
 
 import (
 	"github.com/teasec4/ollama-go-cli/internal/client"
+	"github.com/teasec4/ollama-go-cli/internal/constants"
 )
 
 // Session manages chat state: history, token count, and client connection
@@ -33,7 +34,7 @@ func NewSession(name, model, ollamaURL string) *Session {
 // AddUserMessage adds a user message to the session history
 func (s *Session) AddUserMessage(text string) {
 	s.Messages = append(s.Messages, Message{
-		Role:    "user",
+		Role:    constants.RoleUser,
 		Content: text,
 	})
 }
@@ -41,7 +42,7 @@ func (s *Session) AddUserMessage(text string) {
 // AddAssistantMessage adds an assistant message to the session history
 func (s *Session) AddAssistantMessage(text string) {
 	s.Messages = append(s.Messages, Message{
-		Role:    "assistant",
+		Role:    constants.RoleAssistant,
 		Content: text,
 	})
 }
@@ -61,11 +62,6 @@ func (s *Session) GetMessages() []client.ChatMessage {
 		})
 	}
 	return msgs
-}
-
-// GetHistory returns the message history
-func (s *Session) GetHistory() []Message {
-	return s.Messages
 }
 
 // Clear resets the session (clears history and token count)
