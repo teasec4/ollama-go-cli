@@ -7,17 +7,19 @@ import (
 
 // Session manages chat state: history and client connection
 type Session struct {
-	Messages   []openai.ChatCompletionMessage
-	TokenCount int
-	Client     *client.OllamaClient
+	Messages       []openai.ChatCompletionMessage
+	TokenCount     int
+	Client         *client.OllamaClient
+	ContextMaxSize int // Maximum context window size
 }
 
 // NewSession creates a new chat session
 func NewSession(model, ollamaURL string) *Session {
 	return &Session{
-		Messages:   []openai.ChatCompletionMessage{},
-		TokenCount: 0,
-		Client:     client.NewOllamaClient(ollamaURL, model),
+		Messages:       []openai.ChatCompletionMessage{},
+		TokenCount:     0,
+		Client:         client.NewOllamaClient(ollamaURL, model),
+		ContextMaxSize: 4096, // Default context size, can be updated by client
 	}
 }
 

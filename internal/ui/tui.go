@@ -352,12 +352,13 @@ func (m *TUIModel) View() string {
 		m.err = nil
 	}
 
-	// Status bar with token count and scroll info
+	// Status bar with context usage and scroll info
 	scrollInfo := ""
 	if m.scrollOffset > 0 {
 		scrollInfo = fmt.Sprintf("  ↑ %d lines", m.scrollOffset)
 	}
-	statusMsg := fmt.Sprintf("Tokens: %d", m.session.TokenCount)
+	contextBar := renderContextBar(m.session.TokenCount, m.session.ContextMaxSize, 12)
+	statusMsg := fmt.Sprintf("Context: %s", contextBar)
 	if scrollInfo != "" {
 		statusMsg += scrollInfo
 	}
@@ -414,6 +415,15 @@ func (m *TUIModel) animateThinker() tea.Cmd {
 // sendMessageCmd sends message to Ollama and updates UI
 func (m *TUIModel) sendMessageCmd() tea.Cmd {
 	return func() tea.Msg {
+		// Estimate tokens for user message (last message in session)
+		if len(m.session.Messages) > 0 {
+			lastMsg := m.session.Messages[len(m.session.Messages)-1]
+			if lastMsg.Role == "user" {
+				userTokens := estimateTokens(lastMsg.Content)
+				m.session.AddTokens(userTokens)
+			}
+		}
+
 		textChan, resultChan, err := m.session.Client.ChatStream(m.session.Messages)
 
 		if err != nil {
@@ -427,8 +437,12 @@ func (m *TUIModel) sendMessageCmd() tea.Cmd {
 			m.mu.Unlock()
 		}
 
-		// Wait for metrics
+		// Wait for metrics and add response tokens
 		<-resultChan
+		
+		// Estimate tokens for assistant response
+		assistantTokens := estimateTokens(m.currentReply)
+		m.session.AddTokens(assistantTokens)
 
 		return msgThinkingDone{}
 	}
