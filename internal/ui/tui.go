@@ -20,23 +20,21 @@ type TUIModel struct {
 	width        int
 	height       int
 	thinking     bool
-	memPercent   int
 	err          error
 	currentReply string
 	thinkFrame   int
-	scrollOffset int // For scrolling through message history
-	mu           sync.Mutex // Protect concurrent access
+	scrollOffset int
+	mu           sync.Mutex
 }
 
 // NewTUIModel creates a new TUI model
 func NewTUIModel(session *chat.Session) *TUIModel {
 	return &TUIModel{
-		session:    session,
-		input:      "",
-		width:      80,
-		height:     24,
-		thinking:   false,
-		memPercent: 0,
+		session:  session,
+		input:    "",
+		width:    80,
+		height:   24,
+		thinking: false,
 		thinkFrame: 0,
 	}
 }
@@ -151,8 +149,6 @@ func (m *TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.mu.Lock()
 		m.thinking = false
 		m.session.AddAssistantMessage(m.currentReply)
-		tokensUsed := chat.EstimateTokens(m.currentReply)
-		m.session.AddTokens(tokensUsed)
 		m.currentReply = ""
 		m.mu.Unlock()
 
@@ -205,6 +201,10 @@ func (m *TUIModel) View() string {
 		Foreground(lipgloss.Color(constants.ColorLimeGreen)).
 		Bold(true)
 
+	userLabelStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color(constants.ColorCyan)).
+		Bold(true)
+
 	inputStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color(constants.ColorCyan)).
 		Bold(true).
@@ -233,14 +233,28 @@ func (m *TUIModel) View() string {
 	m.mu.Lock()
 	// Add session history
 	for _, msg := range m.session.Messages {
-		if msg.Role == constants.RoleUser {
+		if msg.Role == "user" {
 			text := fmt.Sprintf("You: %s", msg.Content)
 			wrappedText := wrapText(text, msgWidth)
-			for _, line := range strings.Split(wrappedText, "\n") {
+			lines := strings.Split(wrappedText, "\n")
+			for i, line := range lines {
 				if line != "" {
-					messageLines = append(messageLines, userStyle.Render(line))
+					if i == 0 {
+						// First line: bold label + content
+						parts := strings.SplitN(line, ": ", 2)
+						if len(parts) == 2 {
+							rendered := userLabelStyle.Render(parts[0]+": ") + userStyle.Render(parts[1])
+							messageLines = append(messageLines, rendered)
+						} else {
+							messageLines = append(messageLines, userStyle.Render(line))
+						}
+					} else {
+						messageLines = append(messageLines, userStyle.Render(line))
+					}
 				}
 			}
+			// Add separator between messages
+			messageLines = append(messageLines, "")
 		} else {
 			text := fmt.Sprintf("Assistant: %s", msg.Content)
 			wrappedText := wrapText(text, msgWidth)
@@ -261,6 +275,8 @@ func (m *TUIModel) View() string {
 					}
 				}
 			}
+			// Add separator between messages
+			messageLines = append(messageLines, "")
 		}
 	}
 
@@ -336,16 +352,19 @@ func (m *TUIModel) View() string {
 		m.err = nil
 	}
 
-	// Memory bar
-	memBar := buildMemoryBar(m.memPercent)
+	// Status bar with token count and scroll info
 	scrollInfo := ""
 	if m.scrollOffset > 0 {
-		scrollInfo = fmt.Sprintf(" | ↑ %d lines", m.scrollOffset)
+		scrollInfo = fmt.Sprintf("  ↑ %d lines", m.scrollOffset)
 	}
-	statusBar := statusStyle.Render(fmt.Sprintf("120k [%d%% %s]%s", m.memPercent, memBar, scrollInfo))
+	statusMsg := fmt.Sprintf("Tokens: %d", m.session.TokenCount)
+	if scrollInfo != "" {
+		statusMsg += scrollInfo
+	}
+	statusBar := statusStyle.Render(statusMsg)
 
 	// Help text
-	helpContent := "PgUp/↑:scroll up  PgDn/↓:scroll down  Ctrl+C:quit"
+	helpContent := "PgUp/↑ scroll  PgDn/↓ scroll  Ctrl+C quit"
 	helpText := helpStyle.Render(helpContent)
 
 	// Right-align help text (use visible length for calculation)
@@ -395,8 +414,7 @@ func (m *TUIModel) animateThinker() tea.Cmd {
 // sendMessageCmd sends message to Ollama and updates UI
 func (m *TUIModel) sendMessageCmd() tea.Cmd {
 	return func() tea.Msg {
-		messages := m.session.GetMessages()
-		textChan, resultChan, err := m.session.Client.ChatStream(messages)
+		textChan, resultChan, err := m.session.Client.ChatStream(m.session.Messages)
 
 		if err != nil {
 			return msgError{err}

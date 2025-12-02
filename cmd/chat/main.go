@@ -12,14 +12,9 @@ import (
 
 func main() {
 	cfg := config.LoadConfig()
-
-	// Create chat session
-	session := chat.NewSession("main-session", cfg.Model, cfg.OllamaURL)
-
-	// Create TUI model
+	session := chat.NewSession(cfg.Model, cfg.OllamaURL)
 	model := ui.NewTUIModel(session)
 
-	// Run TUI
 	p := tea.NewProgram(model, tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)

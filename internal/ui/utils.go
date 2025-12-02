@@ -2,8 +2,6 @@ package ui
 
 import (
 	"strings"
-
-	"github.com/teasec4/ollama-go-cli/internal/constants"
 )
 
 // visibleLen returns visible length excluding ANSI codes
@@ -61,24 +59,4 @@ func wrapText(text string, maxWidth int) string {
 	return strings.Join(lines, "\n")
 }
 
-// buildMemoryBar creates a visual memory usage bar
-func buildMemoryBar(percent int) string {
-	if percent > 100 {
-		percent = 100
-	}
-	if percent < 0 {
-		percent = 0
-	}
 
-	filledLength := (percent * constants.MemoryBarLength) / 100
-	bar := "["
-	for i := 0; i < constants.MemoryBarLength; i++ {
-		if i < filledLength {
-			bar += "="
-		} else {
-			bar += " "
-		}
-	}
-	bar += "]"
-	return bar
-}
