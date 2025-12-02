@@ -4,7 +4,6 @@ package config
 type Config struct {
 	OllamaURL     string
 	Model         string
-	AssistantName string
 	TerminalWidth int
 }
 
@@ -12,8 +11,7 @@ type Config struct {
 func DefaultConfig() *Config {
 	return &Config{
 		OllamaURL:     "http://localhost:11434",
-		Model:         "gpt-oss:20b",
-		AssistantName: "Max",
+		Model:         "llama3:latest",
 		TerminalWidth: 80,
 	}
 }
