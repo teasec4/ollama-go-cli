@@ -1,0 +1,14 @@
+# Compiled binaries
+/ollama-chat
+/chat
+*.exe
+*.dll
+*.so
+*.dylib
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
